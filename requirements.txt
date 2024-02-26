@@ -1,0 +1,11 @@
+numpy
+matplotlib
+tqdm
+tensorboard
+torch
+torchvision
+jaxtyping
+jax[cpu]
+optax
+equinox
+pyyaml

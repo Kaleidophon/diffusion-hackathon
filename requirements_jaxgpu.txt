@@ -1,0 +1,14 @@
+numpy
+matplotlib
+tqdm
+tensorboard
+torch
+torchvision
+jaxtyping
+jax[cuda12_pip] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+torch --index-url https://download.pytorch.org/whl/cpu
+torchvision --index-url https://download.pytorch.org/whl/cpu
+torchaudio --index-url https://download.pytorch.org/whl/cpu
+optax
+equinox
+pyyaml
