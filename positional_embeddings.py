@@ -31,14 +31,14 @@ class SinusoidEncoding(torch.nn.Module):
         )
         pos_embed[:, 0::2] = torch.sin(position * div_term)
         pos_embed[:, 1::2] = torch.cos(position * div_term)
-        pos_embed = pos_embed.unsqueeze(0)
+        # pos_embed = pos_embed.unsqueeze(0)
 
         # register_buffer => Tensor which is not a parameter, but should be part of the modules state.
         # Used for tensors that need to be on the same device as the module.
         # persistent=False tells PyTorch to not add the buffer to the state dict (e.g. when we save the model)
         self.register_buffer("pos_embed", pos_embed, persistent=False)
 
-    def forward(self, x, t):
+    def forward(self, x: torch.FloatTensor, t: torch.LongTensor):
         """
         Adds positional embeddings to token embeddings.
         N = batch size
@@ -48,8 +48,7 @@ class SinusoidEncoding(torch.nn.Module):
         :param x: token embeddings. Shape: (N, L, E)
         :return: token_embeddings + positional embeddings. Shape: (N, L, E)
         """
-        # TODO: Batch t
-        pos_embed = self.pos_embed[:, t]
-        pos_embed = pos_embed.repeat(x.shape[0], 1).unsqueeze(-1).unsqueeze(-1)
-        x = x + pos_embed
+        batch_pos_embed = self.pos_embed[t, :]
+        batch_pos_embed = batch_pos_embed.unsqueeze(-1).unsqueeze(-1)
+        x = x + batch_pos_embed
         return x

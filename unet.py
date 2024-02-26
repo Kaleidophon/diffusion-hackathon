@@ -101,7 +101,7 @@ class UNet(nn.Module):
         self.positional1 = SinusoidEncoding(hidden_dim=16, max_len=num_timesteps)
         self.positional2 = SinusoidEncoding(hidden_dim=32, max_len=num_timesteps)
 
-    def forward(self, x: torch.FloatTensor, t: int ):
+    def forward(self, x: torch.FloatTensor, t: torch.LongTensor):
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
