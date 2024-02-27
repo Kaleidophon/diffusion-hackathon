@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import wandb
 
 # PROJECT
 from dataset.sprites_dataset import SpritesDataset
@@ -20,7 +21,6 @@ from unet import UNet
 # TODO: Check tomorrow
 # - Vary noise schedule hyperparameters
 # - Add W&B support
-# - Loop over data multiple times
 
 
 class DiffusionModel(nn.Module):
@@ -56,7 +56,8 @@ def run_diffusion_model(
     beta_max: float,
     lr: float,
     num_training_steps: int,
-    num_samples: int
+    num_samples: int,
+    wandb_run = None
 ):
     # This is a torch.utils.data.Dataset object
     dataset = SpritesDataset()
@@ -79,7 +80,13 @@ def run_diffusion_model(
     alpha_bar = torch.cumprod(alpha, dim=0)
 
     progress_bar = tqdm(total=num_training_steps)
-    for step, batch in enumerate(dataloader):
+
+    def loop_dataloader(dataloader):
+        while True:
+            for batch in dataloader:
+                yield batch
+
+    for step, batch in enumerate(loop_dataloader(dataloader)):
 
         if step > num_training_steps:
             break
@@ -93,6 +100,7 @@ def run_diffusion_model(
 
         # Noise schedule
         sampled_timesteps = torch.randint(num_timesteps, size=(batch.shape[0],))
+        # sampled_timesteps = torch.randint(num_timesteps, size=(1, )).repeat(batch_size)
         alpha_batched = alpha.unsqueeze(0).repeat(batch_size, 1)
         alpha_bar_batched = torch.stack([
             torch.prod(alpha_batched[i, :timestep], dim=0)
@@ -105,6 +113,13 @@ def run_diffusion_model(
         predicted_noise = model.forward(input_, sampled_timesteps)
         loss = loss_func(noise, predicted_noise)
 
+        if wandb_run is not None:
+            wandb_run.log({
+                "loss": loss.item(),
+                "predicted_noise": predicted_noise.mean(),
+                "alpha_bar": alpha_bar_batched.mean()
+            })
+
         progress_bar.set_description(f"[Step {step +1}] Loss: {loss.item():.4f}")
         progress_bar.update(1)
 
@@ -115,6 +130,7 @@ def run_diffusion_model(
     # ### SAMPLING ###
 
     images = []
+    final_images = []
     with torch.no_grad():
         for _ in tqdm(range(num_samples)):
 
@@ -132,6 +148,8 @@ def run_diffusion_model(
                 if t % 100 == 0 or t == 1:  # Save every 100 steps and during last step
                     x_samples.append((x + 1) / 2)
 
+            final_images.append((x + 1) / 2)
+
             # Rescale image values back
             images.append(torch.cat(x_samples, dim=0))
 
@@ -139,6 +157,10 @@ def run_diffusion_model(
         #images = (images - torch.min(images, dim=-1)[0].unsqueeze(-1)) / (torch.max(images, dim=-1)[0].unsqueeze(-1) - torch.min(images, dim=-1)[0].unsqueeze(-1))
         #images = torch.clip(images, 0, 1) * 255
         plot_process(images, "Garbage 1", save_path="plots.png")
+
+        if wandb_run is not None:
+            images = wandb.Image(torch.cat(final_images, dim=0), caption="Samples sprites.")
+            wandb.log({"examples": images})
 
 
 if __name__ == "__main__":
@@ -151,8 +173,22 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.0002)
     parser.add_argument("--num-training-steps", type=int, default=1000)
     parser.add_argument("--num-samples", type=int, default=25)
+    parser.add_argument("--wandb", action="store_true", default=False)
 
     args = parser.parse_args()
+
+    wandb_run = None
+    if args.wandb:
+        wandb_run = wandb.init(
+            project="diffusion-hackathon",
+            config={
+                "batch_size": args.batch_size,
+                "num_timesteps": args.num_timesteps,
+                "beta_min": args.beta_min,
+                "beta_max": args.beta_max,
+                "lr": args.lr
+            },
+        )
 
     run_diffusion_model(
         batch_size=args.batch_size,
@@ -162,5 +198,6 @@ if __name__ == "__main__":
         beta_max=args.beta_max,
         lr=args.lr,
         num_training_steps=args.num_training_steps,
-        num_samples=args.num_samples
+        num_samples=args.num_samples,
+        wandb_run=wandb_run
     )

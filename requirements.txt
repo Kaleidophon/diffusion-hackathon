@@ -9,3 +9,4 @@ jax[cpu]
 optax
 equinox
 pyyaml
+wandb
