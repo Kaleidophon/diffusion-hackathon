@@ -16,11 +16,11 @@ import wandb
 # PROJECT
 from dataset.sprites_dataset import SpritesDataset
 from utils.plotting import plot_process
-from unet import UNet
+from unets import UNet, UNet_conditional
 
 # TODO: Check tomorrow
 # - Vary noise schedule hyperparameters
-# - Add W&B support
+# - Other regularization?
 
 
 class DiffusionModel(nn.Module):
@@ -28,11 +28,22 @@ class DiffusionModel(nn.Module):
     Implementation of a simple diffusion model.
     """
 
-    def __init__(self, num_channels: int, image_size: int, num_timesteps: int):
+    def __init__(
+        self,
+        model_type: str,
+        num_channels: int,
+        image_size: int,
+        num_timesteps: int
+    ):
         super().__init__()
         self.num_channels = num_channels
         self.image_size = image_size
-        self.unet = UNet(n_channels=num_channels, num_timesteps=num_timesteps)
+
+        if model_type == "convolution":
+            self.unet = UNet(n_channels=num_channels, num_timesteps=num_timesteps)
+
+        elif model_type == "attention":
+            self.unet = UNet_conditional(c_in=num_channels, time_dim=num_timesteps)
 
     def forward(self, x: torch.FloatTensor, t: torch.LongTensor):
         # Implement a minimal U-net
@@ -49,6 +60,7 @@ def create_linear_noise_schedule(beta_min: float, beta_max: float, num_timesteps
 
 
 def run_diffusion_model(
+    model_type: str,
     batch_size: int,
     shuffle: bool,
     num_timesteps: int,
@@ -66,7 +78,7 @@ def run_diffusion_model(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     # Initialize diffusion model
-    model = DiffusionModel(num_channels=3, image_size=16, num_timesteps=num_timesteps)
+    model = DiffusionModel(model_type=model_type, num_channels=3, image_size=16, num_timesteps=num_timesteps)
     noise_schedule = create_linear_noise_schedule(beta_min, beta_max, num_timesteps)
 
     # Training code
@@ -131,6 +143,8 @@ def run_diffusion_model(
 
     images = []
     final_images = []
+    model.eval()
+
     with torch.no_grad():
         for _ in tqdm(range(num_samples)):
 
@@ -174,6 +188,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-training-steps", type=int, default=1000)
     parser.add_argument("--num-samples", type=int, default=25)
     parser.add_argument("--wandb", action="store_true", default=False)
+    parser.add_argument("--model-type", type=str, choices=["convolution", "attention"], default="convolution")
 
     args = parser.parse_args()
 
@@ -191,6 +206,7 @@ if __name__ == "__main__":
         )
 
     run_diffusion_model(
+        model_type=args.model_type,
         batch_size=args.batch_size,
         shuffle=args.shuffle,
         num_timesteps=args.num_timesteps,
