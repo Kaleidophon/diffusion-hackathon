@@ -10,3 +10,6 @@ optax
 equinox
 pyyaml
 wandb
+tensorflow
+tensorflow-macos
+tensorflow-metal
