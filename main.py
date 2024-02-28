@@ -86,12 +86,11 @@ def run_diffusion_model(
 
     # Training code
     loss_func = nn.MSELoss()
-    optimizer = optim.RMSprop(lr=lr, alpha=0.9999, params=model.parameters())
+    optimizer = optim.AdamW(lr=lr, params=model.parameters())
 
     # Initialize exponential moving average
     ema = EMA(0.995)
     ema_model = copy.deepcopy(model).eval().requires_grad_(False)
-
 
     # ### TRAINING ###
     # Now we can iterate over the dataloader to get batches of data
@@ -190,8 +189,6 @@ def run_diffusion_model(
             images.append(torch.cat(x_samples, dim=0))
 
         images = torch.stack(images, dim=0).cpu()
-        #images = (images - torch.min(images, dim=-1)[0].unsqueeze(-1)) / (torch.max(images, dim=-1)[0].unsqueeze(-1) - torch.min(images, dim=-1)[0].unsqueeze(-1))
-        #images = torch.clip(images, 0, 1) * 255
         plot_process(images, "Garbage 1", save_path="plots.png")
 
         if wandb_run is not None:
@@ -203,11 +200,11 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--batch-size", type=int)
     parser.add_argument("--shuffle", action="store_true", default=False)
-    parser.add_argument("--num-timesteps", type=int, default=100)
+    parser.add_argument("--num-timesteps", type=int, default=2000)
     parser.add_argument("--beta-min", type=float, default=0.0001)
     parser.add_argument("--beta-max", type=float, default=0.02)
-    parser.add_argument("--lr", type=float, default=0.0002)
-    parser.add_argument("--num-training-steps", type=int, default=1000)
+    parser.add_argument("--lr", type=float, default=0.0005)
+    parser.add_argument("--num-training-steps", type=int, default=150000)
     parser.add_argument("--num-samples", type=int, default=25)
     parser.add_argument("--wandb", action="store_true", default=False)
     parser.add_argument("--model-type", type=str, choices=["convolution", "attention"], default="convolution")
